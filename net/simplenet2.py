@@ -1,7 +1,6 @@
-import torch
+import torch as th
 import torch.nn as nn
-from simplenet import NormalizationLayer
-from torch import Tensor
+from net.simplenet import NormalizationLayer
 
 config_layer = [('c', 8),
                 ('o', 0),
@@ -43,6 +42,7 @@ def resize_map(x, output_size):
 
     return outmap
 
+
 class OutputLayer(nn.Module):
     def __init__(self):
          super(OutputLayer, self).__init__()
@@ -64,11 +64,11 @@ class SparseConv(nn.Module):
             self.sconv += [conv2d(in_channels//nsplit, out_channels//nsplit, kernel_size=kernel_size)]
 
     def forward(self, x):
-        x = torch.chunk(x, 2, 1)
+        x = th.chunk(x, 2, 1)
 
         y = [conv(x[i]) for i, conv in enumerate(self.sconv)]
 
-        y = torch.cat(y, 1)
+        y = th.cat(y, 1)
 
         return y
 
@@ -77,11 +77,11 @@ class SimpleNet2(nn.Module):
 
     def __init__(self, is_train):
         super(SimpleNet2, self).__init__()
-        self.is_train = False
-        self.layers = self.__make_layer(config_layer)
+        self.is_train = is_train
+        self.features = self.__make_layer(config_layer)
         self.classifier = nn.Sequential(
             self.__conv_bn_act(120, 3, 3),
-            self.__conv_bn_act(3, 3, 1))
+            self.__conv_bn_act(3, 1, 1))
         self.__initiaize_weights()
 
     def __initiaize_weights(self):
@@ -100,10 +100,7 @@ class SimpleNet2(nn.Module):
         padding = kernel_size // 2
         module.add_module('conv', nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=padding, bias=has_bias))
 
-        if self.is_train:
-            module.add_module('bn', nn.BatchNorm2d(out_channels, affine=False))
-        else:
-            module.add_module('bn', NormalizationLayer(nn.Parameter(Tensor([1]), requires_grad=False), nn.Parameter(Tensor([1]), requires_grad=False)))
+        module.add_module('bn', nn.BatchNorm2d(out_channels, affine=False))
 
         if has_activation:
             module.add_module('relu', nn.ReLU())
@@ -128,20 +125,20 @@ class SimpleNet2(nn.Module):
 
         return layers
 
-
     def forward(self, x):
-        output_size = [45, 30]
+        output_size = [x.shape[2]//8, x.shape[3]//8]
         map_list = []
 
         net = x
-        for layer in self.layers:
-            net = layer(net)
-            if isinstance(layer, OutputLayer):
+
+        for idx, feature in enumerate(self.features):
+            net = feature(net)
+            if isinstance(feature, OutputLayer):
                 map_list += [net]
 
         maps = [resize_map(map, output_size) for map in map_list]
 
-        map = torch.cat(maps, 1)
+        map = th.cat(maps, 1)
 
         map = self.classifier(map)
 

@@ -34,6 +34,7 @@ class SimpleNet(nn.Module):
 
         self.__initiaize_weights()
 
+
     def __initiaize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
