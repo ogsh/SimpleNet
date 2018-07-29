@@ -1,4 +1,5 @@
 import os
+import datetime
 import torch as th
 from train.bb_dataset import BBDataSet
 
@@ -13,6 +14,7 @@ def train(csv_file, root_dir, epochs, batch_size=1, learning_rate=0.01):
     net.train()
     print(net.is_train)
 
+    output_model_dir = '../resource/trained_model/'
 
     optimizer = th.optim.Adam(net.parameters(), lr=learning_rate)
     #criterion = th.nn.CrossEntropyLoss()
@@ -34,13 +36,18 @@ def train(csv_file, root_dir, epochs, batch_size=1, learning_rate=0.01):
             loss = criterion(outputs, labels)
 
             loss.backward()
+            optimizer.step()
 
             running_loss += loss.item()
             if i % 19 == 0:
                 print('[%d, %5d loss: %.5f]' %
                       (epoch + 1, i + 1, running_loss))
                 running_loss = 0.
-                th.save(net.state_dict(), "../resource/trained_model/model.pth")
+
+        if epoch % 10 == 9:
+            now = datetime.datetime.now()
+            model_name = output_model_dir + 'model_{0:%Y%m%d%H%M}'.format(now) + '.pth'
+            th.save(net.state_dict(), model_name)
 
 
 if __name__ == "__main__":
